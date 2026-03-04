@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
  */
 object JsonParser {
 
-    private val json = Json {
+    val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }

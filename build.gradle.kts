@@ -11,7 +11,7 @@ repositories {
     mavenCentral()
 }
 
-val cliktVersion = "5.0.3"
+val cliktVersion = "4.4.0"
 val mordantVersion = "3.0.2"
 val ktorVersion = "3.1.1"
 val jgitVersion = "7.1.0.202411261347-r"
@@ -49,8 +49,15 @@ tasks.test {
     useJUnitPlatform()
 }
 
-kotlin {
-    jvmToolchain(21)
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
 // Fat JAR for distribution

@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "2.1.10"
     kotlin("plugin.serialization") version "2.1.10"
     application
+    id("org.graalvm.buildtools.native") version "0.10.4"
 }
 
 group = "dev.llmreview"
@@ -43,6 +44,27 @@ dependencies {
 
 application {
     mainClass.set("dev.llmreview.MainKt")
+}
+
+graalvmNative {
+    binaries {
+        named("main") {
+            imageName.set("llmreview")
+            mainClass.set("dev.llmreview.MainKt")
+            buildArgs.addAll(
+                "--no-fallback",
+                "--static",
+                "--libc=musl",
+                "-H:+ReportExceptionStackTraces",
+                "--initialize-at-build-time=kotlin",
+                "--initialize-at-build-time=kotlinx",
+                "--initialize-at-build-time=org.slf4j",
+                "--initialize-at-build-time=io.ktor",
+            )
+            // Uses JAVA_HOME (set to GraalVM) when toolchainDetection is off
+        }
+    }
+    toolchainDetection.set(false)
 }
 
 tasks.test {

@@ -1,0 +1,72 @@
+[
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$AutoCRLF",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$CheckStat",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$EOL",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$HideDotFiles",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$SymLinks",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.lib.CoreConfig$LogRefUpdates",
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.jgit.internal.storage.file.FileRepository",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "org.eclipse.jgit.transport.HttpTransport",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.eclipse.jgit.util.SystemReader",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.ktor.client.engine.cio.CIO",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.ktor.client.engine.cio.CIOEngineConfig",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "kotlin.reflect.jvm.internal.ReflectionFactoryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "kotlin.internal.jdk8.JDK8PlatformImplementations",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "kotlin.internal.jdk7.JDK7PlatformImplementations",
+    "allDeclaredConstructors": true
+  }
+]

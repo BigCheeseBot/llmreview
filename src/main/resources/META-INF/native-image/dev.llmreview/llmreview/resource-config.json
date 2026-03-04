@@ -1,0 +1,13 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "org/eclipse/jgit/internal/.*\\.properties$"},
+      {"pattern": "org/eclipse/jgit/.*\\.properties$"},
+      {"pattern": "META-INF/services/.*$"},
+      {"pattern": "META-INF/native-image/.*$"}
+    ]
+  },
+  "bundles": [
+    {"name": "org.eclipse.jgit.internal.JGitText"}
+  ]
+}

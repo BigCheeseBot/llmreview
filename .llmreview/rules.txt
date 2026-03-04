@@ -6,3 +6,7 @@
 # Error messages must be user-friendly and actionable.
 no star/wildcard imports
 no inline comments unless absolutely necessary
+only use inline comments to explain why something is done, never what is being done
+prefer functional style over imperative
+no single line or bracketless if statements
+prefer `it` over named lambda parameters

@@ -37,9 +37,12 @@ class ReviewCommand : CliktCommand(
     private val quiet by option("--quiet", "-q", help = "Suppress progress output").flag()
 
     override fun run() {
-        // Validate ref args
-        if ((baseRef != null) != (headRef != null)) {
-            echo("✗ Both --base and --head must be specified together", err = true)
+        // If --base is given without --head, default --head to HEAD
+        val effectiveHead = headRef ?: if (baseRef != null) "HEAD" else null
+
+        // Validate: --head without --base doesn't make sense
+        if (headRef != null && baseRef == null) {
+            echo("✗ --head requires --base to be specified", err = true)
             throw SystemExitException(ExitCode.CONFIG_ERROR.code)
         }
 
@@ -103,7 +106,8 @@ class ReviewCommand : CliktCommand(
             val reviewFile = runBlocking {
                 pipeline.execute(
                     baseRef = baseRef,
-                    headRef = headRef,
+                    headRef = effectiveHead,
+
                     staged = staged,
                     rules = rules,
                     llmParams = llmParams,

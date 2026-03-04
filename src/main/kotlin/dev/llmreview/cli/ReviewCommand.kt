@@ -92,6 +92,26 @@ class ReviewCommand : CliktCommand(
             temperature = temperature,
         )
 
+        if (verbose) {
+            echo("[debug] Endpoint: $endpoint")
+            echo("[debug] Model: $model")
+            echo("[debug] Temperature: $temperature")
+            echo("[debug] Timeout: ${timeoutSeconds}s")
+            echo("[debug] Diff mode: ${when {
+                baseRef != null -> "base($baseRef)..head(${effectiveHead})"
+                staged -> "staged"
+                else -> "unstaged"
+            }}")
+            echo("[debug] Rules (${rules.lines().size}):")
+            rules.lines().forEach { echo("[debug]   • $it") }
+            if (annotate) {
+                echo("[debug] Phase 2 annotations: enabled")
+                if (maxContextBytes != null) {
+                    echo("[debug] Max context bytes: $maxContextBytes")
+                }
+            }
+        }
+
         val pipeline = ReviewPipeline(
             gitService = gitService,
             llmClient = llmClient,
@@ -99,8 +119,12 @@ class ReviewCommand : CliktCommand(
             runId = actualRunId,
             annotate = annotate,
             maxContextBytes = maxContextBytes,
+            verbose = verbose,
             onProgress = { msg ->
                 if (!quiet) echo(msg)
+            },
+            onDebug = { msg ->
+                if (verbose) echo(msg)
             },
         )
 

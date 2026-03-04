@@ -11,6 +11,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import kotlin.time.measureTimedValue
+import kotlin.time.DurationUnit
 
 class ReviewPipeline(
     private val gitService: GitService,
@@ -19,7 +21,9 @@ class ReviewPipeline(
     private val runId: String,
     private val annotate: Boolean,
     private val maxContextBytes: Long?,
+    private val verbose: Boolean = false,
     private val onProgress: (String) -> Unit = {},
+    private val onDebug: (String) -> Unit = {},
 ) {
     private val json = Json {
         prettyPrint = true
@@ -52,10 +56,15 @@ class ReviewPipeline(
             return reviewFile
         }
         File(runDir, "diff.patch").writeText(diff)
+        onDebug("[debug] Diff size: ${diff.length} chars, ${diff.lines().size} lines")
+        onDebug("[debug] HEAD: ${gitService.headSha}")
+        onDebug("[debug] Dirty: ${gitService.isDirty}")
 
         // FR-2: Affected files
         val fileList = gitService.getAffectedFiles(baseRef, headRef, staged)
         File(runDir, "files_in_diff.json").writeText(json.encodeToString(DiffFileList.serializer(), fileList))
+        onDebug("[debug] Affected files:")
+        fileList.files.forEach { onDebug("[debug]   ${it.operation.name.lowercase()} ${it.path}") }
 
         // FR-6: Manifest
         val manifest = RunManifest(
@@ -93,6 +102,9 @@ class ReviewPipeline(
         val report = generateReport(diffReview, annotations)
         val reviewFile = File(runDir, "review.md")
         reviewFile.writeText(report)
+        onDebug("[debug] Report: ${report.length} chars, ${report.lines().size} lines")
+        onDebug("[debug] Findings: ${diffReview.findings.size} (${diffReview.findings.groupBy { it.severity }.map { "${it.value.size} ${it.key.name.lowercase()}" }.joinToString(", ")})")
+        onDebug("[debug] Run artifacts saved to: $runDir")
 
         onProgress("Done! Report: ${reviewFile.path}")
         return reviewFile
@@ -101,7 +113,33 @@ class ReviewPipeline(
     private suspend fun executeDiffReview(rules: String, diff: String): DiffReview {
         val systemPrompt = Prompts.phase1System(rules)
         val userPrompt = Prompts.phase1User(diff)
-        val response = llmClient.chatCompletion(systemPrompt, userPrompt)
+        onDebug("[debug] ── Phase 1 Prompt ──")
+        onDebug("[debug] System prompt: ${systemPrompt.length} chars")
+        onDebug("[debug] User prompt: ${userPrompt.length} chars (~${(systemPrompt.length + userPrompt.length) / 4} tokens est.)")
+        if (verbose) {
+            onDebug("[debug] ┌─ System Prompt ─")
+            systemPrompt.lines().forEach { onDebug("[debug] │ $it") }
+            onDebug("[debug] ├─ User Prompt ─")
+            userPrompt.lines().take(50).forEach { onDebug("[debug] │ $it") }
+            if (userPrompt.lines().size > 50) {
+                onDebug("[debug] │ ... (${userPrompt.lines().size - 50} more lines)")
+            }
+            onDebug("[debug] └─────────────")
+        }
+
+        val (response, duration) = measureTimedValue {
+            llmClient.chatCompletion(systemPrompt, userPrompt)
+        }
+        onDebug("[debug] Phase 1 response: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
+        if (verbose) {
+            onDebug("[debug] ┌─ Raw LLM Response ─")
+            response.lines().take(30).forEach { onDebug("[debug] │ $it") }
+            if (response.lines().size > 30) {
+                onDebug("[debug] │ ... (${response.lines().size - 30} more lines)")
+            }
+            onDebug("[debug] └─────────────")
+        }
+
         return JsonParser.parse(response)
     }
 
@@ -112,16 +150,23 @@ class ReviewPipeline(
         files.mapNotNull { file ->
             val content = gitService.readFileContent(file.path) ?: return@mapNotNull null
 
-            // Check size limit
             if (maxContextBytes != null && content.toByteArray().size > maxContextBytes) {
                 onProgress("  ⚠ Skipping ${file.path} (exceeds max-context-bytes)")
                 return@mapNotNull null
             }
 
+            onDebug("[debug] ── Phase 2: ${file.path} (${content.lines().size} lines, ${content.length} chars) ──")
+
             async {
                 val systemPrompt = Prompts.phase2System(rules)
                 val userPrompt = Prompts.phase2User(file.path, content)
-                val response = llmClient.chatCompletion(systemPrompt, userPrompt)
+                onDebug("[debug] Phase 2 prompt for ${file.path}: ~${(systemPrompt.length + userPrompt.length) / 4} tokens est.")
+
+                val (response, duration) = measureTimedValue {
+                    llmClient.chatCompletion(systemPrompt, userPrompt)
+                }
+                onDebug("[debug] Phase 2 response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
+
                 val annotation: FileAnnotations = JsonParser.parse(response)
                 file.path to annotation
             }

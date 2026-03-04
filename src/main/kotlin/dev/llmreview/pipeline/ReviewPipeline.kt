@@ -179,11 +179,29 @@ class ReviewPipeline(
                 val systemPrompt = Prompts.phase1System(rules)
                 val userPrompt = Prompts.perFileUser(file.path, fileDiff)
                 onDebug("[debug] Prompt for ${file.path}: ~${(systemPrompt.length + userPrompt.length) / 4} tokens est.")
+                if (verbose) {
+                    onDebug("[debug] ┌─ System Prompt ─")
+                    systemPrompt.lines().forEach { onDebug("[debug] │ $it") }
+                    onDebug("[debug] ├─ User Prompt ─")
+                    userPrompt.lines().take(50).forEach { onDebug("[debug] │ $it") }
+                    if (userPrompt.lines().size > 50) {
+                        onDebug("[debug] │ ... (${userPrompt.lines().size - 50} more lines)")
+                    }
+                    onDebug("[debug] └─────────────")
+                }
 
                 val (response, duration) = measureTimedValue {
                     llmClient.chatCompletion(systemPrompt, userPrompt)
                 }
                 onDebug("[debug] Response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
+                if (verbose) {
+                    onDebug("[debug] ┌─ Raw Response ─")
+                    response.lines().take(30).forEach { onDebug("[debug] │ $it") }
+                    if (response.lines().size > 30) {
+                        onDebug("[debug] │ ... (${response.lines().size - 30} more lines)")
+                    }
+                    onDebug("[debug] └─────────────")
+                }
 
                 val fileReview: DiffReview = JsonParser.parse(response)
                 allFindings.addAll(fileReview.findings)

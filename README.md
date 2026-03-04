@@ -81,9 +81,51 @@ Each run creates `.llmreview/runs/<run-id>/` containing:
 
 ## Building
 
+### JVM (development)
+
 ```bash
-./gradlew build        # Build + test
-./gradlew fatJar       # Create executable fat JAR
+./gradlew build          # Build + test
+./gradlew installDist    # Create runnable distribution
+./build/install/llmreview/bin/llmreview --help
+```
+
+### Native Binary (recommended for distribution)
+
+Produces a single ~45MB statically linked executable — no JVM required.
+
+**Prerequisites:**
+
+- [GraalVM CE 21+](https://github.com/graalvm/graalvm-ce-builds/releases) with `native-image`
+- `musl-tools` (`sudo apt install musl-tools`)
+- Static zlib built for musl:
+
+```bash
+curl -L https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz | tar xz
+cd zlib-1.3.1
+CC=musl-gcc ./configure --static --prefix=/usr/local/musl
+make -j$(nproc) && sudo make install
+sudo cp /usr/local/musl/lib/libz.a /usr/lib/x86_64-linux-musl/
+```
+
+**Build:**
+
+```bash
+GRAALVM_HOME=/path/to/graalvm JAVA_HOME=/path/to/graalvm ./gradlew nativeCompile
+```
+
+The binary is at `build/native/nativeCompile/llmreview`:
+
+```bash
+$ file build/native/nativeCompile/llmreview
+ELF 64-bit LSB executable, x86-64, statically linked
+
+$ ./build/native/nativeCompile/llmreview --help
+```
+
+### Fat JAR
+
+```bash
+./gradlew fatJar
 java -jar build/libs/llmreview-0.1.0-SNAPSHOT-all.jar review
 ```
 

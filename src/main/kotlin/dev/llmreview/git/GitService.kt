@@ -99,15 +99,9 @@ class GitService(workDir: File) {
             else -> "unstaged"
         }
 
-        var mergeBaseSha: String? = null
         var baseSha: String? = null
         if (baseRef != null && headRef != null) {
-            val baseId = repository.resolve(baseRef)
-            val headId = repository.resolve(headRef)
-            baseSha = baseId?.name
-            if (baseId != null && headId != null) {
-                mergeBaseSha = findMergeBase(baseId, headId)?.name
-            }
+            baseSha = repository.resolve(baseRef)?.name
         }
 
         return GitInfo(
@@ -116,7 +110,7 @@ class GitService(workDir: File) {
             baseRef = baseRef,
             headRef = headRef,
             baseSha = baseSha,
-            mergeBaseSha = mergeBaseSha,
+            mergeBaseSha = null,
             diffMode = diffMode,
         )
     }
@@ -145,22 +139,10 @@ class GitService(workDir: File) {
         val headId = repository.resolve(headRef)
             ?: throw IllegalArgumentException("Cannot resolve ref: $headRef")
 
-        val mergeBase = findMergeBase(baseId, headId)
-            ?: throw IllegalStateException("No merge-base found between $baseRef and $headRef")
-
-        val baseTree = prepareTreeParser(mergeBase)
+        // Direct tree diff: base..head
+        val baseTree = prepareTreeParser(baseId)
         val headTree = prepareTreeParser(headId)
         return formatter.scan(baseTree, headTree)
-    }
-
-    private fun findMergeBase(a: ObjectId, b: ObjectId): ObjectId? {
-        RevWalk(repository).use { walk ->
-            walk.setRetainBody(false)
-            walk.markStart(walk.parseCommit(a))
-            walk.markStart(walk.parseCommit(b))
-            val mergeBase = walk.next()
-            return mergeBase?.id
-        }
     }
 
     private fun prepareTreeParser(objectId: ObjectId?): AbstractTreeIterator {

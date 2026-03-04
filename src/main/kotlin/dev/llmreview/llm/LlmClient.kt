@@ -2,6 +2,7 @@ package dev.llmreview.llm
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -47,6 +48,11 @@ class LlmClient(
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(json)
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 300_000  // 5 minutes — local LLMs can be slow
+            connectTimeoutMillis = 10_000
+            socketTimeoutMillis = 300_000
         }
     }
 

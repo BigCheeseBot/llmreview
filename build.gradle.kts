@@ -12,7 +12,7 @@ repositories {
 }
 
 val cliktVersion = "4.4.0"
-val mordantVersion = "3.0.2"
+val mordantVersion = "2.7.2"
 val ktorVersion = "3.1.1"
 val jgitVersion = "7.1.0.202411261347-r"
 

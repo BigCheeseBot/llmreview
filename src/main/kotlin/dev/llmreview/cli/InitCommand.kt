@@ -1,7 +1,6 @@
 package dev.llmreview.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
-import dev.llmreview.model.ExitCode
 import java.io.File
 
 class InitCommand : CliktCommand(
@@ -32,21 +31,41 @@ class InitCommand : CliktCommand(
             """.trimIndent() + "\n"
         )
 
-        // Auto-add .llmreview/runs/ to .gitignore
-        val gitignore = File(".gitignore")
-        val ignoreEntry = ".llmreview/runs/"
-        if (gitignore.exists()) {
-            val content = gitignore.readText()
-            if (ignoreEntry !in content) {
-                gitignore.appendText("\n$ignoreEntry\n")
-                echo("📝 Added $ignoreEntry to .gitignore")
-            }
-        } else {
-            gitignore.writeText("$ignoreEntry\n")
-            echo("📝 Created .gitignore with $ignoreEntry")
-        }
+        ensureGitignore(
+            listOf(
+                ".llmreview/runs/",
+                ".llmreview/latest",
+            )
+        )
 
         echo("✓ Initialized .llmreview/")
         echo("  → Edit .llmreview/rules.txt to add your review rules")
+    }
+
+    private fun ensureGitignore(entries: List<String>) {
+        val gitignore = File(".gitignore")
+        val existingLines = if (gitignore.exists()) {
+            gitignore.readLines().map { it.trim() }.toSet()
+        } else {
+            emptySet()
+        }
+
+        val missing = entries.filter { it !in existingLines }
+
+        if (missing.isEmpty()) {
+            return
+        }
+
+        if (gitignore.exists()) {
+            val content = gitignore.readText()
+            val needsNewline = content.isNotEmpty() && !content.endsWith("\n")
+            val prefix = if (needsNewline) "\n" else ""
+            gitignore.appendText(prefix + missing.joinToString("\n") + "\n")
+        } else {
+            gitignore.writeText(missing.joinToString("\n") + "\n")
+            echo("📝 Created .gitignore")
+        }
+
+        missing.forEach { echo("📝 Added $it to .gitignore") }
     }
 }

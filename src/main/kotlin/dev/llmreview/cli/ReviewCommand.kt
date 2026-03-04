@@ -33,6 +33,7 @@ class ReviewCommand : CliktCommand(
     private val envFile by option("--env-file", help = "Path to .env file for API key")
     private val temperature by option("--temperature", help = "LLM temperature (0.0-2.0)").double().default(0.1)
     private val maxContextBytes by option("--max-context-bytes", help = "Max file size in bytes for annotation").long()
+    private val timeoutSeconds by option("--timeout", help = "Request timeout in seconds per LLM call").long().default(300)
     private val verbose by option("--verbose", "-v", help = "Verbose output").flag()
     private val quiet by option("--quiet", "-q", help = "Suppress progress output").flag()
 
@@ -82,6 +83,7 @@ class ReviewCommand : CliktCommand(
             model = model,
             temperature = temperature,
             apiKey = apiKey,
+            timeoutMs = timeoutSeconds * 1000,
         )
 
         val llmParams = LlmParams(

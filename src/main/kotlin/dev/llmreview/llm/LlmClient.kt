@@ -39,6 +39,7 @@ class LlmClient(
     private val model: String,
     private val temperature: Double = 0.1,
     private val apiKey: String? = null,
+    private val timeoutMs: Long = 300_000,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -50,9 +51,9 @@ class LlmClient(
             json(json)
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 300_000  // 5 minutes — local LLMs can be slow
+            requestTimeoutMillis = timeoutMs
             connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 300_000
+            socketTimeoutMillis = timeoutMs
         }
     }
 

@@ -23,24 +23,27 @@ class InitCommand : CliktCommand(
         rulesFile.writeText(
             """
             # llmreview rules — one rule per line
-            # These rules guide the LLM during code review.
-            # Examples:
+            # Lines starting with # are comments and will be ignored.
+            #
+            # Examples (uncomment to activate):
             # All public functions must have KDoc comments.
             # Avoid using !! (non-null assertion) in Kotlin.
             # Error messages must be user-friendly and actionable.
             """.trimIndent() + "\n"
         )
 
-        // Suggest .gitignore entry
+        // Auto-add .llmreview/runs/ to .gitignore
         val gitignore = File(".gitignore")
         val ignoreEntry = ".llmreview/runs/"
         if (gitignore.exists()) {
             val content = gitignore.readText()
             if (ignoreEntry !in content) {
-                echo("💡 Consider adding to .gitignore: $ignoreEntry")
+                gitignore.appendText("\n$ignoreEntry\n")
+                echo("📝 Added $ignoreEntry to .gitignore")
             }
         } else {
-            echo("💡 Consider adding to .gitignore: $ignoreEntry")
+            gitignore.writeText("$ignoreEntry\n")
+            echo("📝 Created .gitignore with $ignoreEntry")
         }
 
         echo("✓ Initialized .llmreview/")

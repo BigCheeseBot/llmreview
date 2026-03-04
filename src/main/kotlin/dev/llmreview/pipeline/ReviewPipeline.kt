@@ -20,6 +20,7 @@ class ReviewPipeline(
     private val runDir: File,
     private val runId: String,
     private val annotate: Boolean,
+    private val perFile: Boolean = false,
     private val maxContextBytes: Long?,
     private val verbose: Boolean = false,
     private val onProgress: (String) -> Unit = {},
@@ -77,8 +78,12 @@ class ReviewPipeline(
         File(runDir, "manifest.json").writeText(json.encodeToString(RunManifest.serializer(), manifest))
 
         // Phase 1: Diff Review
-        onProgress("Phase 1: Reviewing diff (${fileList.files.size} files affected)...")
-        val diffReview = executeDiffReview(rules, diff)
+        val diffReview = if (perFile) {
+            executePerFileReview(rules, fileList, baseRef, headRef, staged)
+        } else {
+            onProgress("Phase 1: Reviewing diff (${fileList.files.size} files affected)...")
+            executeDiffReview(rules, diff)
+        }
         File(runDir, "phase1_diff_review.json").writeText(json.encodeToString(DiffReview.serializer(), diffReview))
 
         // Phase 2: Annotations (opt-in)
@@ -141,6 +146,118 @@ class ReviewPipeline(
         }
 
         return JsonParser.parse(response)
+    }
+
+    private suspend fun executePerFileReview(
+        rules: String,
+        fileList: DiffFileList,
+        baseRef: String?,
+        headRef: String?,
+        staged: Boolean,
+    ): DiffReview {
+        val reviewableFiles = fileList.files.filter {
+            it.operation != FileOperation.DELETE && it.operation != FileOperation.BINARY
+        }
+        onProgress("Phase 1: Reviewing ${reviewableFiles.size} files individually (per-file mode)...")
+
+        val allFindings = mutableListOf<Finding>()
+        val fileSummaries = mutableListOf<String>()
+        var reviewed = 0
+        var failed = 0
+
+        reviewableFiles.forEachIndexed { index, file ->
+            onProgress("  [${index + 1}/${reviewableFiles.size}] Reviewing ${file.path}...")
+            val fileDiff = gitService.generateSingleFileDiff(baseRef, headRef, staged, file.path)
+            if (fileDiff.isBlank()) {
+                onDebug("[debug] Skipping ${file.path} — empty diff")
+                return@forEachIndexed
+            }
+
+            onDebug("[debug] ── Per-file: ${file.path} (${fileDiff.length} chars, ${fileDiff.lines().size} lines) ──")
+
+            try {
+                val systemPrompt = Prompts.phase1System(rules)
+                val userPrompt = Prompts.perFileUser(file.path, fileDiff)
+                onDebug("[debug] Prompt for ${file.path}: ~${(systemPrompt.length + userPrompt.length) / 4} tokens est.")
+
+                val (response, duration) = measureTimedValue {
+                    llmClient.chatCompletion(systemPrompt, userPrompt)
+                }
+                onDebug("[debug] Response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
+
+                val fileReview: DiffReview = JsonParser.parse(response)
+                allFindings.addAll(fileReview.findings)
+                fileSummaries.add("**${file.path}**: ${fileReview.summary}")
+                reviewed++
+
+                // Save per-file review
+                val perFileDir = File(runDir, "per_file")
+                perFileDir.mkdirs()
+                val sanitized = file.path.replace("/", "_").replace("\\", "_")
+                File(perFileDir, "$sanitized.json").writeText(
+                    json.encodeToString(DiffReview.serializer(), fileReview)
+                )
+            } catch (e: Exception) {
+                onProgress("  ⚠ Failed to review ${file.path}: ${e.message}")
+                onDebug("[debug] Error for ${file.path}: ${e.stackTraceToString()}")
+                failed++
+            }
+        }
+
+        onProgress("  ✓ Reviewed $reviewed files ($failed failed)")
+
+        // Build consolidated review
+        val consolidatedSummary = buildString {
+            appendLine("Per-file review of $reviewed files ($failed failed).")
+            appendLine()
+            fileSummaries.forEach { appendLine("- $it") }
+        }
+
+        val consolidatedMarkdown = buildString {
+            appendLine("# Per-File Code Review")
+            appendLine()
+            appendLine("Reviewed **$reviewed** files individually" +
+                if (failed > 0) " ($failed failed to parse)" else "")
+            appendLine()
+            if (fileSummaries.isNotEmpty()) {
+                appendLine("## File Summaries")
+                appendLine()
+                fileSummaries.forEach { appendLine("- $it") }
+                appendLine()
+            }
+            if (allFindings.isNotEmpty()) {
+                appendLine("## All Findings")
+                appendLine()
+                val grouped = allFindings.groupBy { it.severity }
+                listOf(Severity.ERROR, Severity.WARN, Severity.INFO).forEach { severity ->
+                    val findings = grouped[severity] ?: return@forEach
+                    val icon = when (severity) {
+                        Severity.ERROR -> "🔴"
+                        Severity.WARN -> "🟡"
+                        Severity.INFO -> "🔵"
+                    }
+                    appendLine("### $icon ${severity.name} (${findings.size})")
+                    appendLine()
+                    findings.forEach { finding ->
+                        append("- ")
+                        if (finding.file != null) append("`${finding.file}`")
+                        if (finding.lineHint != null) append(" L${finding.lineHint}")
+                        if (finding.file != null) append(": ")
+                        appendLine(finding.message)
+                        if (finding.suggestion != null) {
+                            appendLine("  → ${finding.suggestion}")
+                        }
+                    }
+                    appendLine()
+                }
+            }
+        }
+
+        return DiffReview(
+            summary = consolidatedSummary,
+            findings = allFindings,
+            markdown = consolidatedMarkdown,
+        )
     }
 
     private suspend fun executeAnnotations(

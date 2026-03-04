@@ -56,6 +56,27 @@ class GitService(workDir: File) {
     }
 
     /**
+     * Generate a unified diff for a single file.
+     */
+    fun generateSingleFileDiff(baseRef: String?, headRef: String?, staged: Boolean, filePath: String): String {
+        val out = ByteArrayOutputStream()
+        DiffFormatter(out).use { formatter ->
+            formatter.setRepository(repository)
+            formatter.isDetectRenames = true
+            formatter.setPathFilter(org.eclipse.jgit.treewalk.filter.PathFilter.create(filePath))
+
+            val entries = when {
+                baseRef != null && headRef != null -> diffMergeBase(formatter, baseRef, headRef)
+                staged -> diffStaged(formatter)
+                else -> diffUnstaged(formatter)
+            }
+
+            entries.forEach { formatter.format(it) }
+        }
+        return out.toString(Charsets.UTF_8)
+    }
+
+    /**
      * Extract the list of affected files from a diff.
      */
     fun getAffectedFiles(baseRef: String?, headRef: String?, staged: Boolean): DiffFileList {

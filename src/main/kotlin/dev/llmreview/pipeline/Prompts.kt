@@ -43,6 +43,14 @@ $diff
 ```
     """.trimIndent()
 
+    fun perFileUser(filePath: String, diff: String): String = """
+Review the following changes to `$filePath`:
+
+```diff
+$diff
+```
+    """.trimIndent()
+
     fun phase2System(rules: String): String = """
 You are a code analysis expert. You will annotate every line of a source file with structured metadata.
 

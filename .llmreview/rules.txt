@@ -5,3 +5,4 @@
 # Avoid using !! (non-null assertion) in Kotlin.
 # Error messages must be user-friendly and actionable.
 no star/wildcard imports
+no inline comments unless absolutely necessary

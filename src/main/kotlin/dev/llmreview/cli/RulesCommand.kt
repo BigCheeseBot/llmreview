@@ -1,6 +1,7 @@
 package dev.llmreview.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.int
@@ -8,8 +9,8 @@ import java.io.File
 
 class RulesCommand : CliktCommand(
     name = "rules",
-    help = "Manage review rules",
 ) {
+    override fun help(context: Context) = "Manage review rules"
     init {
         subcommands(
             RulesAddCommand(),
@@ -44,8 +45,8 @@ private fun loadRules(file: File): List<Pair<Int, String>> {
 
 class RulesAddCommand : CliktCommand(
     name = "add",
-    help = "Add a new rule",
 ) {
+    override fun help(context: Context) = "Add a new rule"
     private val ruleText by argument(help = "The rule text to add")
 
     override fun run() {
@@ -57,8 +58,8 @@ class RulesAddCommand : CliktCommand(
 
 class RulesRemoveCommand : CliktCommand(
     name = "remove",
-    help = "Remove a rule by line number",
 ) {
+    override fun help(context: Context) = "Remove a rule by line number"
     private val lineNumber by argument(help = "Line number to remove").int()
 
     override fun run() {
@@ -78,8 +79,8 @@ class RulesRemoveCommand : CliktCommand(
 
 class RulesListCommand : CliktCommand(
     name = "list",
-    help = "List all rules with line numbers",
 ) {
+    override fun help(context: Context) = "List all rules with line numbers"
     override fun run() {
         val file = ensureRulesExist()
         val rules = loadRules(file)

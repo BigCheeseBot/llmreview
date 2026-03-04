@@ -1,6 +1,7 @@
 package dev.llmreview.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -20,8 +21,8 @@ import java.util.Properties
 
 class ReviewCommand : CliktCommand(
     name = "review",
-    help = "Run a code review on the current diff",
 ) {
+    override fun help(context: Context) = "Run a code review on the current diff"
     private val baseRef by option("--base", help = "Base ref for merge-base diff")
     private val headRef by option("--head", help = "Head ref for merge-base diff")
     private val staged by option("--staged", help = "Review staged changes").flag()

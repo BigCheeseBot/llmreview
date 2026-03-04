@@ -1,12 +1,13 @@
 package dev.llmreview.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import java.io.File
 
 class InitCommand : CliktCommand(
     name = "init",
-    help = "Initialize .llmreview/ directory with rules template",
 ) {
+    override fun help(context: Context) = "Initialize .llmreview/ directory with rules template"
     override fun run() {
         val dir = File(".llmreview")
 

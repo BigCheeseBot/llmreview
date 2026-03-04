@@ -1,8 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.1.10"
-    kotlin("plugin.serialization") version "2.1.10"
+    kotlin("jvm") version "2.3.10"
+    kotlin("plugin.serialization") version "2.3.10"
     application
-    id("org.graalvm.buildtools.native") version "0.10.4"
+    id("org.graalvm.buildtools.native") version "0.11.3"
 }
 
 group = "dev.llmreview"
@@ -12,7 +12,7 @@ repositories {
     mavenCentral()
 }
 
-val cliktVersion = "4.4.0"
+val cliktVersion = "5.1.0"
 val mordantVersion = "2.7.2"
 val ktorVersion = "3.1.1"
 val jgitVersion = "7.1.0.202411261347-r"

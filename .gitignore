@@ -13,4 +13,6 @@ build/
 Thumbs.db
 
 # llmreview run artifacts (users should add this to their repos)
-# .llmreview/runs/
+.llmreview/runs/
+.llmreview/latest
+llmreview-linux-x86_64

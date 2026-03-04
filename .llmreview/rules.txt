@@ -1,0 +1,7 @@
+# llmreview rules — one rule per line
+# These rules guide the LLM during code review.
+# Examples:
+# All public functions must have KDoc comments.
+# Avoid using !! (non-null assertion) in Kotlin.
+# Error messages must be user-friendly and actionable.
+no star/wildcard imports

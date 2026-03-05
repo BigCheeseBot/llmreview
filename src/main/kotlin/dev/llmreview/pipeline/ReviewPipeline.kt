@@ -9,6 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.nio.file.FileSystems
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import kotlin.time.measureTimedValue
@@ -21,6 +22,7 @@ class ReviewPipeline(
     private val runId: String,
     private val annotate: Boolean,
     private val perFile: Boolean = false,
+    private val excludePatterns: List<String> = emptyList(),
     private val maxContextBytes: Long?,
     private val verbose: Boolean = false,
     private val onProgress: (String) -> Unit = {},
@@ -56,15 +58,35 @@ class ReviewPipeline(
             reviewFile.writeText("# Review\n\nNo changes detected.\n")
             return reviewFile
         }
-        File(runDir, "diff.patch").writeText(diff)
-        onDebug("[debug] Diff size: ${diff.length} chars, ${diff.lines().size} lines")
+        // If excludes are active, filter the diff to remove excluded file hunks
+        val filteredDiff = if (excludePatterns.isNotEmpty()) {
+            filterDiff(diff, excludePatterns)
+        } else {
+            diff
+        }
+        File(runDir, "diff.patch").writeText(filteredDiff)
+        onDebug("[debug] Diff size: ${filteredDiff.length} chars, ${filteredDiff.lines().size} lines" +
+            if (filteredDiff.length < diff.length) " (filtered from ${diff.length} chars)" else "")
         onDebug("[debug] HEAD: ${gitService.headSha}")
         onDebug("[debug] Dirty: ${gitService.isDirty}")
 
         // FR-2: Affected files
-        val fileList = gitService.getAffectedFiles(baseRef, headRef, staged)
+        val rawFileList = gitService.getAffectedFiles(baseRef, headRef, staged)
+
+        // Apply exclude patterns
+        val fileList = if (excludePatterns.isNotEmpty()) {
+            val filtered = rawFileList.files.filter { file ->
+                val excluded = matchesExclude(file.path, excludePatterns)
+                if (excluded) onDebug("[debug] Excluded: ${file.path}")
+                !excluded
+            }
+            DiffFileList(files = filtered)
+        } else {
+            rawFileList
+        }
+
         File(runDir, "files_in_diff.json").writeText(json.encodeToString(DiffFileList.serializer(), fileList))
-        onDebug("[debug] Affected files:")
+        onDebug("[debug] Affected files${if (excludePatterns.isNotEmpty()) " (after excludes)" else ""}:")
         fileList.files.forEach { onDebug("[debug]   ${it.operation.name.lowercase()} ${it.path}") }
 
         // FR-6: Manifest
@@ -82,7 +104,7 @@ class ReviewPipeline(
             executePerFileReview(rules, fileList, baseRef, headRef, staged)
         } else {
             onProgress("Phase 1: Reviewing diff (${fileList.files.size} files affected)...")
-            executeDiffReview(rules, diff)
+            executeDiffReview(rules, filteredDiff)
         }
         File(runDir, "phase1_diff_review.json").writeText(json.encodeToString(DiffReview.serializer(), diffReview))
 
@@ -377,5 +399,56 @@ class ReviewPipeline(
         }
 
         return sb.toString()
+    }
+
+    /**
+     * Check if a file path matches any exclude pattern.
+     * Supports both simple globs and path globs with directory wildcards.
+     */
+    private fun matchesExclude(filePath: String, patterns: List<String>): Boolean {
+        val path = java.nio.file.Path.of(filePath)
+        val fileName = path.fileName?.toString() ?: return false
+
+        return patterns.any { pattern ->
+            matchesPattern(path, fileName, pattern)
+        }
+    }
+
+    private fun matchesPattern(path: java.nio.file.Path, fileName: String, pattern: String): Boolean {
+        // Match against full path
+        val fullMatcher = FileSystems.getDefault().getPathMatcher("glob:$pattern")
+        if (fullMatcher.matches(path)) return true
+
+        // Also match pattern against just the filename (e.g. "*.png" matches "dir/file.png")
+        if (!pattern.contains("/")) {
+            val nameMatcher = FileSystems.getDefault().getPathMatcher("glob:$pattern")
+            if (nameMatcher.matches(java.nio.file.Path.of(fileName))) return true
+
+            // Try with ** prefix (e.g. "*.png" becomes "**/*.png")
+            val recursiveMatcher = FileSystems.getDefault().getPathMatcher("glob:**/" + pattern)
+            if (recursiveMatcher.matches(path)) return true
+        }
+
+        return false
+    }
+
+    /**
+     * Filter a unified diff to remove hunks for files matching exclude patterns.
+     */
+    private fun filterDiff(diff: String, patterns: List<String>): String {
+        val result = StringBuilder()
+        var skip = false
+
+        for (line in diff.lines()) {
+            if (line.startsWith("diff --git ")) {
+                val path = line.substringAfterLast(" b/")
+                skip = matchesExclude(path, patterns)
+            }
+            if (!skip) {
+                result.appendLine(line)
+            }
+        }
+
+        return result.toString().trimEnd() + "\n"
     }
 }

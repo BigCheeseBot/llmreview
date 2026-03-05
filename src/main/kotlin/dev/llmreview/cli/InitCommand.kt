@@ -32,6 +32,22 @@ class InitCommand : CliktCommand(
             """.trimIndent() + "\n"
         )
 
+        val excludeFile = File(dir, "exclude")
+        if (!excludeFile.exists()) {
+            excludeFile.writeText(
+                """
+                # llmreview exclude — glob patterns to exclude files from review
+                # Lines starting with # are comments and will be ignored.
+                # Useful for git-crypt encrypted files, generated code, etc.
+                #
+                # Examples (uncomment to activate):
+                # secrets/**
+                # *.enc
+                # vendor/**
+                """.trimIndent() + "\n"
+            )
+        }
+
         ensureGitignore(
             listOf(
                 ".llmreview/runs/",

@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.double
 import com.github.ajalt.clikt.parameters.types.long
@@ -35,6 +36,7 @@ class ReviewCommand : CliktCommand(
     private val temperature by option("--temperature", help = "LLM temperature (0.0-2.0)").double().default(0.1)
     private val maxContextBytes by option("--max-context-bytes", help = "Max file size in bytes for annotation").long()
     private val timeoutSeconds by option("--timeout", help = "Request timeout in seconds per LLM call").long().default(300)
+    private val exclude by option("--exclude", "-x", help = "Glob pattern to exclude files (repeatable)").multiple()
     private val perFile by option("--per-file", help = "Review each file individually (timeout applies per file)").flag()
     private val verbose by option("--verbose", "-v", help = "Verbose output").flag()
     private val quiet by option("--quiet", "-q", help = "Suppress progress output").flag()
@@ -67,6 +69,18 @@ class ReviewCommand : CliktCommand(
         if (rules.isEmpty()) {
             echo("✗ No rules defined. Add rules with 'llmreview rules add'.", err = true)
             throw SystemExitException(ExitCode.CONFIG_ERROR.code)
+        }
+
+        // Load exclude patterns (CLI + .llmreview/exclude file)
+        val excludePatterns = buildList {
+            addAll(exclude)
+            val excludeFile = File(".llmreview/exclude")
+            if (excludeFile.exists()) {
+                excludeFile.readLines()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && !it.startsWith("#") }
+                    .forEach { add(it) }
+            }
         }
 
         // Initialize services
@@ -106,6 +120,10 @@ class ReviewCommand : CliktCommand(
             }}")
             echo("[debug] Rules (${rules.lines().size}):")
             rules.lines().forEach { echo("[debug]   • $it") }
+            if (excludePatterns.isNotEmpty()) {
+                echo("[debug] Exclude patterns (${excludePatterns.size}):")
+                excludePatterns.forEach { echo("[debug]   • $it") }
+            }
             if (perFile) {
                 echo("[debug] Per-file mode: enabled (timeout per file)")
             }
@@ -124,6 +142,7 @@ class ReviewCommand : CliktCommand(
             runId = actualRunId,
             annotate = annotate,
             perFile = perFile,
+            excludePatterns = excludePatterns,
             maxContextBytes = maxContextBytes,
             verbose = verbose,
             onProgress = { msg ->

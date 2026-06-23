@@ -25,8 +25,10 @@ class ReviewPipeline(
     private val excludePatterns: List<String> = emptyList(),
     private val maxContextBytes: Long?,
     private val verbose: Boolean = false,
+    private val stream: Boolean = false,
     private val onProgress: (String) -> Unit = {},
     private val onDebug: (String) -> Unit = {},
+    private val onToken: (String) -> Unit = {},
 ) {
     private val json = Json {
         prettyPrint = true
@@ -155,7 +157,11 @@ class ReviewPipeline(
         }
 
         val (response, duration) = measureTimedValue {
-            llmClient.chatCompletion(systemPrompt, userPrompt)
+            if (stream) {
+                llmClient.chatCompletionStreaming(systemPrompt, userPrompt, onToken)
+            } else {
+                llmClient.chatCompletion(systemPrompt, userPrompt)
+            }
         }
         onDebug("[debug] Phase 1 response: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
         if (verbose) {
@@ -213,7 +219,11 @@ class ReviewPipeline(
                 }
 
                 val (response, duration) = measureTimedValue {
-                    llmClient.chatCompletion(systemPrompt, userPrompt)
+                    if (stream) {
+                        llmClient.chatCompletionStreaming(systemPrompt, userPrompt, onToken)
+                    } else {
+                        llmClient.chatCompletion(systemPrompt, userPrompt)
+                    }
                 }
                 onDebug("[debug] Response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
                 if (verbose) {
@@ -320,7 +330,11 @@ class ReviewPipeline(
                 onDebug("[debug] Phase 2 prompt for ${file.path}: ~${(systemPrompt.length + userPrompt.length) / 4} tokens est.")
 
                 val (response, duration) = measureTimedValue {
-                    llmClient.chatCompletion(systemPrompt, userPrompt)
+                    if (stream) {
+                        llmClient.chatCompletionStreaming(systemPrompt, userPrompt, onToken)
+                    } else {
+                        llmClient.chatCompletion(systemPrompt, userPrompt)
+                    }
                 }
                 onDebug("[debug] Phase 2 response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
 

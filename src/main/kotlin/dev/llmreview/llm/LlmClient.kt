@@ -89,9 +89,95 @@ class LlmClient(
             ?: throw LlmException("LLM returned empty response")
     }
 
+    /**
+     * Send a streaming chat completion request. Calls [onToken] for each content chunk
+     * as it arrives. Returns the full accumulated response.
+     */
+    suspend fun chatCompletionStreaming(
+        systemPrompt: String,
+        userPrompt: String,
+        onToken: (String) -> Unit,
+    ): String {
+        val url = "${endpoint.trimEnd('/')}/v1/chat/completions?stream=true"
+
+        val request = ChatCompletionRequest(
+            model = model,
+            messages = listOf(
+                ChatMessage(role = "system", content = systemPrompt),
+                ChatMessage(role = "user", content = userPrompt),
+            ),
+            temperature = temperature,
+        )
+
+        val response = client.post(url) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "text/event-stream")
+            header("Cache-Control", "no-cache")
+            header("Connection", "keep-alive")
+            if (apiKey != null) {
+                header("Authorization", "Bearer $apiKey")
+            }
+            setBody(request)
+        }
+
+        if (!response.status.isSuccess()) {
+            throw LlmException("LLM API returned ${response.status}: ${response.bodyAsText()}")
+        }
+
+        val body = response.bodyAsText()
+        val sb = StringBuilder()
+
+        for (line in body.lines()) {
+            val trimmed = line.trim()
+
+            // End of stream
+            if (trimmed == "data: [DONE]") break
+
+            // Parse SSE data lines
+            if (trimmed.startsWith("data: ")) {
+                val data = trimmed.substring(6)
+                try {
+                    val streamChunk = json.decodeFromString<StreamChunk>(data)
+                    val content = streamChunk.choices
+                        .firstOrNull()
+                        ?.delta
+                        ?.content
+                    if (!content.isNullOrBlank()) {
+                        sb.append(content)
+                        onToken(content)
+                    }
+                } catch (_: Exception) {
+                    // Skip malformed chunks (some servers send partial lines)
+                }
+            }
+        }
+
+        val result = sb.toString()
+        if (result.isBlank()) {
+            throw LlmException("LLM returned empty streaming response")
+        }
+        return result
+    }
+
     fun close() {
         client.close()
     }
 }
+
+@Serializable
+data class StreamChunk(
+    val choices: List<StreamChoice>,
+)
+
+@Serializable
+data class StreamChoice(
+    val delta: StreamDelta,
+)
+
+@Serializable
+data class StreamDelta(
+    val role: String? = null,
+    val content: String? = null,
+)
 
 class LlmException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

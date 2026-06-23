@@ -38,6 +38,7 @@ class ReviewCommand : CliktCommand(
     private val timeoutSeconds by option("--timeout", help = "Request timeout in seconds per LLM call").long().default(300)
     private val exclude by option("--exclude", "-x", help = "Glob pattern to exclude files (repeatable)").multiple()
     private val perFile by option("--per-file", help = "Review each file individually (timeout applies per file)").flag()
+    private val stream by option("--stream", help = "Stream LLM output in real-time (token-by-token)").flag()
     private val verbose by option("--verbose", "-v", help = "Verbose output").flag()
     private val quiet by option("--quiet", "-q", help = "Suppress progress output").flag()
 
@@ -127,6 +128,9 @@ class ReviewCommand : CliktCommand(
             if (perFile) {
                 echo("[debug] Per-file mode: enabled (timeout per file)")
             }
+            if (stream) {
+                echo("[debug] Streaming: enabled (real-time token output)")
+            }
             if (annotate) {
                 echo("[debug] Phase 2 annotations: enabled")
                 if (maxContextBytes != null) {
@@ -145,11 +149,15 @@ class ReviewCommand : CliktCommand(
             excludePatterns = excludePatterns,
             maxContextBytes = maxContextBytes,
             verbose = verbose,
+            stream = stream,
             onProgress = { msg ->
                 if (!quiet) echo(msg)
             },
             onDebug = { msg ->
                 if (verbose) echo(msg)
+            },
+            onToken = { token ->
+                if (stream && !quiet) print(token)
             },
         )
 

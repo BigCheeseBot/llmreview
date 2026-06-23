@@ -330,11 +330,7 @@ class ReviewPipeline(
                 onDebug("[debug] Phase 2 prompt for ${file.path}: ~${(systemPrompt.length + userPrompt.length) / 4} tokens est.")
 
                 val (response, duration) = measureTimedValue {
-                    if (stream) {
-                        llmClient.chatCompletionStreaming(systemPrompt, userPrompt, onToken)
-                    } else {
-                        llmClient.chatCompletion(systemPrompt, userPrompt)
-                    }
+                    llmClient.chatCompletion(systemPrompt, userPrompt)
                 }
                 onDebug("[debug] Phase 2 response for ${file.path}: ${response.length} chars in ${duration.toString(DurationUnit.SECONDS, 1)}s")
 
